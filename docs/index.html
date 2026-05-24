@@ -1,247 +1,473 @@
 <!DOCTYPE html>
 <html xmlns='http://www.w3.org/1999/xhtml' lang='' xml:lang=''>
 <head>
-	<meta charset='utf-8' />
-	<meta name='viewport' content='width=device-width, user-scalable=no' />
-	<title>JumpKingClone</title>
-	<style type='text/css'>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, user-scalable=no' />
+    <title>JumpKingClone</title>
+    <style type='text/css'>
 
-		body {
-			touch-action: none;
-			margin: 0;
-			border: 0 none;
-			padding: 0;
-			text-align: center;
-			background-color: black;
-		}
+        body {
+            touch-action: none;
+            margin: 0;
+            border: 0 none;
+            padding: 0;
+            text-align: center;
+            background-color: black;
+        }
 
-		#canvas {
-			display: block;
-			margin: 0;
-			color: white;
-		}
+        #canvas {
+            display: block;
+            margin: 0;
+            color: white;
+        }
 
-		#canvas:focus {
-			outline: none;
-		}
+        #canvas:focus {
+            outline: none;
+        }
 
-		.godot {
-			font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
-			color: #e0e0e0;
-			background-color: #3b3943;
-			background-image: linear-gradient(to bottom, #403e48, #35333c);
-			border: 1px solid #45434e;
-			box-shadow: 0 0 1px 1px #2f2d35;
-		}
+        .godot {
+            font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+            color: #e0e0e0;
+            background-color: #3b3943;
+            background-image: linear-gradient(to bottom, #403e48, #35333c);
+            border: 1px solid #45434e;
+            box-shadow: 0 0 1px 1px #2f2d35;
+        }
 
 
-		/* Status display
-		 * ============== */
+        /* Status display
+         * ============== */
 
-		#status {
-			position: absolute;
-			left: 0;
-			top: 0;
-			right: 0;
-			bottom: 0;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			/* don't consume click events - make children visible explicitly */
-			visibility: hidden;
-		}
+        #status {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* don't consume click events - make children visible explicitly */
+            visibility: hidden;
+        }
 
-		#status-progress {
-			width: 366px;
-			height: 7px;
-			background-color: #38363A;
-			border: 1px solid #444246;
-			padding: 1px;
-			box-shadow: 0 0 2px 1px #1B1C22;
-			border-radius: 2px;
-			visibility: visible;
-		}
+        #status-progress {
+            width: 366px;
+            height: 7px;
+            background-color: #38363A;
+            border: 1px solid #444246;
+            padding: 1px;
+            box-shadow: 0 0 2px 1px #1B1C22;
+            border-radius: 2px;
+            visibility: visible;
+        }
 
-		@media only screen and (orientation:portrait) {
-			#status-progress {
-				width: 61.8%;
-			}
-		}
+        @media only screen and (orientation:portrait) {
+            #status-progress {
+                width: 61.8%;
+            }
+        }
 
-		#status-progress-inner {
-			height: 100%;
-			width: 0;
-			box-sizing: border-box;
-			transition: width 0.5s linear;
-			background-color: #202020;
-			border: 1px solid #222223;
-			box-shadow: 0 0 1px 1px #27282E;
-			border-radius: 3px;
-		}
+        #status-progress-inner {
+            height: 100%;
+            width: 0;
+            box-sizing: border-box;
+            transition: width 0.5s linear;
+            background-color: #202020;
+            border: 1px solid #222223;
+            box-shadow: 0 0 1px 1px #27282E;
+            border-radius: 3px;
+        }
 
-		#status-indeterminate {
-			visibility: visible;
-			position: relative;
-		}
+        #status-indeterminate {
+            visibility: visible;
+            position: relative;
+        }
 
-		#status-indeterminate > div {
-			width: 4.5px;
-			height: 0;
-			border-style: solid;
-			border-width: 9px 3px 0 3px;
-			border-color: #2b2b2b transparent transparent transparent;
-			transform-origin: center 21px;
-			position: absolute;
-		}
+        #status-indeterminate > div {
+            width: 4.5px;
+            height: 0;
+            border-style: solid;
+            border-width: 9px 3px 0 3px;
+            border-color: #2b2b2b transparent transparent transparent;
+            transform-origin: center 21px;
+            position: absolute;
+        }
 
-		#status-indeterminate > div:nth-child(1) { transform: rotate( 22.5deg); }
-		#status-indeterminate > div:nth-child(2) { transform: rotate( 67.5deg); }
-		#status-indeterminate > div:nth-child(3) { transform: rotate(112.5deg); }
-		#status-indeterminate > div:nth-child(4) { transform: rotate(157.5deg); }
-		#status-indeterminate > div:nth-child(5) { transform: rotate(202.5deg); }
-		#status-indeterminate > div:nth-child(6) { transform: rotate(247.5deg); }
-		#status-indeterminate > div:nth-child(7) { transform: rotate(292.5deg); }
-		#status-indeterminate > div:nth-child(8) { transform: rotate(337.5deg); }
+        #status-indeterminate > div:nth-child(1) { transform: rotate( 22.5deg); }
+        #status-indeterminate > div:nth-child(2) { transform: rotate( 67.5deg); }
+        #status-indeterminate > div:nth-child(3) { transform: rotate(112.5deg); }
+        #status-indeterminate > div:nth-child(4) { transform: rotate(157.5deg); }
+        #status-indeterminate > div:nth-child(5) { transform: rotate(202.5deg); }
+        #status-indeterminate > div:nth-child(6) { transform: rotate(247.5deg); }
+        #status-indeterminate > div:nth-child(7) { transform: rotate(292.5deg); }
+        #status-indeterminate > div:nth-child(8) { transform: rotate(337.5deg); }
 
-		#status-notice {
-			margin: 0 100px;
-			line-height: 1.3;
-			visibility: visible;
-			padding: 4px 6px;
-			visibility: visible;
-		}
-	</style>
+        #status-notice {
+            margin: 0 100px;
+            line-height: 1.3;
+            visibility: visible;
+            padding: 4px 6px;
+            visibility: visible;
+        }
+    </style>
 <link id='-gd-engine-icon' rel='icon' type='image/png' href='index.icon.png' />
 <link rel='apple-touch-icon' href='index.apple-touch-icon.png'/>
 
 </head>
 <body>
-	<canvas id='canvas'>
-		HTML5 canvas appears to be unsupported in the current browser.<br />
-		Please try updating or use a different browser.
-	</canvas>
-	<div id='status'>
-		<div id='status-progress' style='display: none;' oncontextmenu='event.preventDefault();'><div id ='status-progress-inner'></div></div>
-		<div id='status-indeterminate' style='display: none;' oncontextmenu='event.preventDefault();'>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-			<div></div>
-		</div>
-		<div id='status-notice' class='godot' style='display: none;'></div>
-	</div>
+    <canvas id='canvas'>
+        HTML5 canvas appears to be unsupported in the current browser.<br />
+        Please try updating or use a different browser.
+    </canvas>
+    <div id='status'>
+        <div id='status-progress' style='display: none;' oncontextmenu='event.preventDefault();'><div id ='status-progress-inner'></div></div>
+        <div id='status-indeterminate' style='display: none;' oncontextmenu='event.preventDefault();'>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div id='status-notice' class='godot' style='display: none;'></div>
+    </div>
 
-	<script type='text/javascript' src='index.js'></script>
-	<script type='text/javascript'>//<![CDATA[
+    <script type='text/javascript' src='index.js'></script>
+    <script type='text/javascript'>//<![CDATA[
 
-		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8087408,"index.wasm":13111445},"focusCanvas":true,"gdnativeLibs":[]};
-		var engine = new Engine(GODOT_CONFIG);
+        const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8087408,"index.wasm":13111445},"focusCanvas":true,"gdnativeLibs":[]};
+        var engine = new Engine(GODOT_CONFIG);
 
-		(function() {
-			const INDETERMINATE_STATUS_STEP_MS = 100;
-			var statusProgress = document.getElementById('status-progress');
-			var statusProgressInner = document.getElementById('status-progress-inner');
-			var statusIndeterminate = document.getElementById('status-indeterminate');
-			var statusNotice = document.getElementById('status-notice');
+        (function() {
+            const INDETERMINATE_STATUS_STEP_MS = 100;
+            var statusProgress = document.getElementById('status-progress');
+            var statusProgressInner = document.getElementById('status-progress-inner');
+            var statusIndeterminate = document.getElementById('status-indeterminate');
+            var statusNotice = document.getElementById('status-notice');
 
-			var initializing = true;
-			var statusMode = 'hidden';
+            var initializing = true;
+            var statusMode = 'hidden';
 
-			var animationCallbacks = [];
-			function animate(time) {
-				animationCallbacks.forEach(callback => callback(time));
-				requestAnimationFrame(animate);
-			}
-			requestAnimationFrame(animate);
+            var animationCallbacks = [];
+            function animate(time) {
+                animationCallbacks.forEach(callback => callback(time));
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate);
 
-			function setStatusMode(mode) {
+            function setStatusMode(mode) {
 
-				if (statusMode === mode || !initializing)
-					return;
-				[statusProgress, statusIndeterminate, statusNotice].forEach(elem => {
-					elem.style.display = 'none';
-				});
-				animationCallbacks = animationCallbacks.filter(function(value) {
-					return (value != animateStatusIndeterminate);
-				});
-				switch (mode) {
-					case 'progress':
-						statusProgress.style.display = 'block';
-						break;
-					case 'indeterminate':
-						statusIndeterminate.style.display = 'block';
-						animationCallbacks.push(animateStatusIndeterminate);
-						break;
-					case 'notice':
-						statusNotice.style.display = 'block';
-						break;
-					case 'hidden':
-						break;
-					default:
-						throw new Error('Invalid status mode');
-				}
-				statusMode = mode;
-			}
+                if (statusMode === mode || !initializing)
+                    return;
+                [statusProgress, statusIndeterminate, statusNotice].forEach(elem => {
+                    elem.style.display = 'none';
+                });
+                animationCallbacks = animationCallbacks.filter(function(value) {
+                    return (value != animateStatusIndeterminate);
+                });
+                switch (mode) {
+                    case 'progress':
+                        statusProgress.style.display = 'block';
+                        break;
+                    case 'indeterminate':
+                        statusIndeterminate.style.display = 'block';
+                        animationCallbacks.push(animateStatusIndeterminate);
+                        break;
+                    case 'notice':
+                        statusNotice.style.display = 'block';
+                        break;
+                    case 'hidden':
+                        break;
+                    default:
+                        throw new Error('Invalid status mode');
+                }
+                statusMode = mode;
+            }
 
-			function animateStatusIndeterminate(ms) {
-				var i = Math.floor(ms / INDETERMINATE_STATUS_STEP_MS % 8);
-				if (statusIndeterminate.children[i].style.borderTopColor == '') {
-					Array.prototype.slice.call(statusIndeterminate.children).forEach(child => {
-						child.style.borderTopColor = '';
-					});
-					statusIndeterminate.children[i].style.borderTopColor = '#dfdfdf';
-				}
-			}
+            function animateStatusIndeterminate(ms) {
+                var i = Math.floor(ms / INDETERMINATE_STATUS_STEP_MS % 8);
+                if (statusIndeterminate.children[i].style.borderTopColor == '') {
+                    Array.prototype.slice.call(statusIndeterminate.children).forEach(child => {
+                        child.style.borderTopColor = '';
+                    });
+                    statusIndeterminate.children[i].style.borderTopColor = '#dfdfdf';
+                }
+            }
 
-			function setStatusNotice(text) {
-				while (statusNotice.lastChild) {
-					statusNotice.removeChild(statusNotice.lastChild);
-				}
-				var lines = text.split('\n');
-				lines.forEach((line) => {
-					statusNotice.appendChild(document.createTextNode(line));
-					statusNotice.appendChild(document.createElement('br'));
-				});
-			};
+            function setStatusNotice(text) {
+                while (statusNotice.lastChild) {
+                    statusNotice.removeChild(statusNotice.lastChild);
+                }
+                var lines = text.split('\n');
+                lines.forEach((line) => {
+                    statusNotice.appendChild(document.createTextNode(line));
+                    statusNotice.appendChild(document.createElement('br'));
+                });
+            };
 
-			function displayFailureNotice(err) {
-				var msg = err.message || err;
-				console.error(msg);
-				setStatusNotice(msg);
-				setStatusMode('notice');
-				initializing = false;
-			};
+            function displayFailureNotice(err) {
+                var msg = err.message || err;
+                console.error(msg);
+                setStatusNotice(msg);
+                setStatusMode('notice');
+                initializing = false;
+            };
 
-			if (!Engine.isWebGLAvailable()) {
-				displayFailureNotice('WebGL not available');
-			} else {
-				setStatusMode('indeterminate');
-				engine.startGame({
-					'onProgress': function (current, total) {
-						if (total > 0) {
-							statusProgressInner.style.width = current/total * 100 + '%';
-							setStatusMode('progress');
-							if (current === total) {
-								// wait for progress bar animation
-								setTimeout(() => {
-									setStatusMode('indeterminate');
-								}, 500);
-							}
-						} else {
-							setStatusMode('indeterminate');
-						}
-					},
-				}).then(() => {
-					setStatusMode('hidden');
-					initializing = false;
-				}, displayFailureNotice);
-			}
-		})();
-	//]]></script>
+            if (!Engine.isWebGLAvailable()) {
+                displayFailureNotice('WebGL not available');
+            } else {
+                setStatusMode('indeterminate');
+                engine.startGame({
+                    'onProgress': function (current, total) {
+                        if (total > 0) {
+                            statusProgressInner.style.width = current/total * 100 + '%';
+                            setStatusMode('progress');
+                            if (current === total) {
+                                // wait for progress bar animation
+                                setTimeout(() => {
+                                    setStatusMode('indeterminate');
+                                }, 500);
+                            }
+                        } else {
+                            setStatusMode('indeterminate');
+                        }
+                    },
+                }).then(() => {
+                    setStatusMode('hidden');
+                    initializing = false;
+                }, displayFailureNotice);
+            }
+        })();
+    //]]></script>
+
+<!-- MOBILE CONTROLS — paste just before </body -->
+<style>
+  #mobile-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 160px;
+    pointer-events: none;
+    z-index: 1000;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: 'Courier New', monospace;
+  }
+
+  #mobile-controls.hidden {
+    display: none;
+  }
+
+  /* ── Toggle button ───────────────────────────── */
+  #controls-toggle {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1001;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+  #controls-toggle:hover { background: rgba(0,0,0,0.8); }
+
+  /* three-line hamburger / X drawn in CSS */
+  #controls-toggle .bar {
+    position: absolute;
+    width: 16px;
+    height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  #controls-toggle .bar:nth-child(1) { transform: translateY(-5px); }
+  #controls-toggle .bar:nth-child(3) { transform: translateY(5px); }
+
+  #controls-toggle.active .bar:nth-child(1) {
+    transform: translateY(0) rotate(45deg);
+  }
+  #controls-toggle.active .bar:nth-child(2) { opacity: 0; }
+  #controls-toggle.active .bar:nth-child(3) {
+    transform: translateY(0) rotate(-45deg);
+  }
+
+  /* ── D-pad left cluster ──────────────────────── */
+  #dpad {
+    position: absolute;
+    bottom: 24px;
+    left: 28px;
+    display: flex;
+    gap: 8px;
+    pointer-events: all;
+  }
+
+  /* ── Jump button right ───────────────────────── */
+  #btn-jump-wrap {
+    position: absolute;
+    bottom: 24px;
+    right: 28px;
+    pointer-events: all;
+  }
+
+  /* ── Shared button style ─────────────────────── */
+  .ctrl-btn {
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.08s, border-color 0.08s, transform 0.08s;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .ctrl-btn:active,
+  .ctrl-btn.pressed {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.7);
+    transform: scale(0.93);
+  }
+
+  /* Arrow shapes drawn in pure CSS — no emoji */
+  .arrow {
+    width: 0;
+    height: 0;
+    display: block;
+  }
+  .arrow-left {
+    border-top: 11px solid transparent;
+    border-bottom: 11px solid transparent;
+    border-right: 18px solid rgba(255,255,255,0.85);
+  }
+  .arrow-right {
+    border-top: 11px solid transparent;
+    border-bottom: 11px solid transparent;
+    border-left: 18px solid rgba(255,255,255,0.85);
+  }
+  .arrow-up {
+    border-left: 11px solid transparent;
+    border-right: 11px solid transparent;
+    border-bottom: 18px solid rgba(255,255,255,0.85);
+  }
+
+  /* make jump button slightly larger */
+  #btn-jump {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+  }
+</style>
+
+<!-- Toggle button -->
+<button id="controls-toggle" title="Toggle mobile controls" aria-label="Toggle mobile controls">
+  <span class="bar"></span>
+  <span class="bar"></span>
+  <span class="bar"></span>
+</button>
+
+<!-- Controls overlay -->
+<div id="mobile-controls">
+  <!-- Left: D-pad -->
+  <div id="dpad">
+    <div class="ctrl-btn" id="btn-left"  data-key="ArrowLeft">
+      <span class="arrow arrow-left"></span>
+    </div>
+    <div class="ctrl-btn" id="btn-right" data-key="ArrowRight">
+      <span class="arrow arrow-right"></span>
+    </div>
+  </div>
+
+  <!-- Right: Jump -->
+  <div id="btn-jump-wrap">
+    <div class="ctrl-btn" id="btn-jump" data-key=" ">
+      <span class="arrow arrow-up"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  var controls   = document.getElementById('mobile-controls');
+  var toggleBtn  = document.getElementById('controls-toggle');
+  var visible    = isTouchDevice; // auto-show on touch
+
+  function applyVisibility() {
+    controls.classList.toggle('hidden', !visible);
+    toggleBtn.classList.toggle('active', visible);
+  }
+  applyVisibility();
+
+  toggleBtn.addEventListener('click', function () {
+    visible = !visible;
+    applyVisibility();
+  });
+
+  // ── Key simulation ──────────────────────────────
+  var held = {};
+
+  function pressKey(key) {
+    if (held[key]) return;
+    held[key] = true;
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      key: key, code: key === ' ' ? 'Space' : 'Arrow' + key.replace('Arrow',''),
+      bubbles: true, cancelable: true
+    }));
+  }
+
+  function releaseKey(key) {
+    if (!held[key]) return;
+    held[key] = false;
+    window.dispatchEvent(new KeyboardEvent('keyup', {
+      key: key, code: key === ' ' ? 'Space' : 'Arrow' + key.replace('Arrow',''),
+      bubbles: true, cancelable: true
+    }));
+  }
+
+  // ── Attach touch + mouse to every button ────────
+  var buttons = document.querySelectorAll('.ctrl-btn');
+  buttons.forEach(function (btn) {
+    var key = btn.getAttribute('data-key');
+
+    function down(e) {
+      e.preventDefault();
+      btn.classList.add('pressed');
+      pressKey(key);
+    }
+    function up(e) {
+      e.preventDefault();
+      btn.classList.remove('pressed');
+      releaseKey(key);
+    }
+
+    btn.addEventListener('touchstart', down, { passive: false });
+    btn.addEventListener('touchend',   up,   { passive: false });
+    btn.addEventListener('touchcancel',up,   { passive: false });
+    btn.addEventListener('mousedown',  down);
+    btn.addEventListener('mouseup',    up);
+    btn.addEventListener('mouseleave', up);
+  });
+
+  // Release all keys if focus leaves window
+  window.addEventListener('blur', function () {
+    Object.keys(held).forEach(releaseKey);
+  });
+})();
+</script>
+
 </body>
 </html>
-
