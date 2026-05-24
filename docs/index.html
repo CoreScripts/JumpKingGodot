@@ -408,26 +408,25 @@
     return document.getElementById('canvas');
   }
 
-  // ── Track native keyboard state to avoid conflicts ────────
-  // We will NOT block or override native keyboard events.
-  // Instead, we let native keyboard events pass through normally.
-  // Our touch controls will ALSO dispatch events to the canvas.
-  // We must track both sources to avoid double-sending? Actually
-  // Godot will receive both native keyboard events AND our
-  // simulated events. That would cause double-inputs if we're
-  // not careful. But Godot typically handles repeated keydowns
-  // gracefully. However for precise control we want to avoid
-  // sending duplicate events. The cleanest approach: Let native
-  // keyboard work perfectly, and our touch controls simulate
-  // the same events. Godot will see two keydowns if user presses
-  // physical key while touching button, but that's rare and
-  // acceptable (character would move twice briefly). To improve:
-  // we could track physical key state separately, but it's fine.
-  // Better: make our touch events NOT interfere and just be
-  // additional input method.
-
-  // We'll track our simulated keys separately.
+  // ── Track simulated keys from touch controls ──────────────
   var simulatedHeld = {};
+
+  // Map A/D to left/right keyCodes for proper simulation
+  function getKeyInfoFromKey(key) {
+    // Handle A/D as aliases for left/right movement
+    if (key === 'a' || key === 'A') {
+      return { key: 'ArrowLeft', code: 'ArrowLeft', mappedKey: 'ArrowLeft' };
+    }
+    if (key === 'd' || key === 'D') {
+      return { key: 'ArrowRight', code: 'ArrowRight', mappedKey: 'ArrowRight' };
+    }
+    // Space/jump
+    if (key === ' ') {
+      return { key: ' ', code: 'Space', mappedKey: ' ' };
+    }
+    // Arrow keys pass through
+    return { key: key, code: key, mappedKey: key };
+  }
 
   function pressKey(key, code) {
     if (simulatedHeld[key]) return;
@@ -507,62 +506,153 @@
   document.getElementById('mobile-controls').addEventListener('touchstart', focusCanvas, { passive: true });
 
   // ── CRITICAL: Ensure native keyboard inputs work perfectly ──
-  // We do NOT call preventDefault on window or document key events.
-  // The canvas already receives native keyboard events because Godot's
-  // engine sets focusCanvas:true and canvas is focusable.
-  // However, some browsers may require canvas to have tabindex or
-  // contenteditable? But Godot's canvas is focusable by default.
-  // To be absolutely safe, make canvas programmatically focusable
-  // and ensure no parent handlers block.
+  // AND add support for A/D keys alongside arrows
   var canvas = getCanvas();
   if (canvas) {
     canvas.setAttribute('tabindex', '0');
     canvas.style.outline = 'none';
-    // Ensure canvas can receive keyboard events even if not clicked
-    canvas.addEventListener('keydown', function(e) {
-      // Let it pass through; Godot will handle
-    });
-    canvas.addEventListener('keyup', function(e) {
-      // Let it pass through
-    });
-    // Prevent any accidental scroll from arrow keys on body
+    
+    // We'll let the canvas handle events normally, but we also need to
+    // ensure A/D keys are sent to Godot. Since Godot may only listen for
+    // arrow keys, we need to translate A/D into arrow keys at the canvas level.
+    // However, Godot's input map might already have A/D bound. To be safe,
+    // we'll capture A/D on window and dispatch arrow events to canvas.
+    // This way physical A/D keys will act exactly like arrow keys.
+    
+    // Keep track of original physical key state to avoid double events
+    var physicalKeysActive = {};
+    
     window.addEventListener('keydown', function(e) {
       var key = e.key;
-      if (key === 'ArrowLeft' || key === 'ArrowRight' || key === ' ' || key === 'Space') {
-        // Only prevent default if the target is not an input/textarea
-        var target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          // Do NOT call preventDefault here! That would block page scrolling
-          // but also might interfere with Godot if it expects default action?
-          // Actually we want arrow keys to work in game, but NOT scroll page.
-          // So we DO prevent default for arrow keys to stop page scroll.
-          // But we must NOT break native keyboard events for game.
-          // Preventing default on arrow keys stops page scroll but still
-          // dispatches the event to canvas. That's perfect.
-          if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') {
-            e.preventDefault();
-          }
-          if (key === ' ' || key === 'Space') {
-            e.preventDefault(); // Prevent page jump on spacebar
+      var target = e.target;
+      // Don't interfere with input fields
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      var mappedKey = null;
+      var mappedCode = null;
+      
+      // Map A and D to left/right arrows
+      if (key === 'a' || key === 'A') {
+        mappedKey = 'ArrowLeft';
+        mappedCode = 'ArrowLeft';
+        e.preventDefault(); // Prevent any default action
+      } else if (key === 'd' || key === 'D') {
+        mappedKey = 'ArrowRight';
+        mappedCode = 'ArrowRight';
+        e.preventDefault();
+      } else if (key === 'ArrowLeft') {
+        mappedKey = 'ArrowLeft';
+        mappedCode = 'ArrowLeft';
+        e.preventDefault(); // Prevent page scroll
+      } else if (key === 'ArrowRight') {
+        mappedKey = 'ArrowRight';
+        mappedCode = 'ArrowRight';
+        e.preventDefault();
+      } else if (key === ' ' || key === 'Space') {
+        mappedKey = ' ';
+        mappedCode = 'Space';
+        e.preventDefault(); // Prevent page jump
+      }
+      
+      if (mappedKey) {
+        // Prevent duplicate events if the same physical key is held
+        var physicalId = key + '_physical';
+        if (!physicalKeysActive[physicalId]) {
+          physicalKeysActive[physicalId] = true;
+          var c = getCanvas();
+          if (c) {
+            // Dispatch the mapped event to canvas
+            c.dispatchEvent(new KeyboardEvent('keydown', {
+              key: mappedKey,
+              code: mappedCode,
+              keyCode: codeToKeyCode(mappedCode),
+              which: codeToKeyCode(mappedCode),
+              bubbles: true,
+              cancelable: true
+            }));
           }
         }
+        // Also prevent default on window to avoid any browser shortcuts
+        e.preventDefault();
       }
     });
-    // Also ensure canvas receives focus on page load or click anywhere
+    
+    window.addEventListener('keyup', function(e) {
+      var key = e.key;
+      var target = e.target;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      var mappedKey = null;
+      var mappedCode = null;
+      
+      if (key === 'a' || key === 'A') {
+        mappedKey = 'ArrowLeft';
+        mappedCode = 'ArrowLeft';
+        e.preventDefault();
+      } else if (key === 'd' || key === 'D') {
+        mappedKey = 'ArrowRight';
+        mappedCode = 'ArrowRight';
+        e.preventDefault();
+      } else if (key === 'ArrowLeft') {
+        mappedKey = 'ArrowLeft';
+        mappedCode = 'ArrowLeft';
+        e.preventDefault();
+      } else if (key === 'ArrowRight') {
+        mappedKey = 'ArrowRight';
+        mappedCode = 'ArrowRight';
+        e.preventDefault();
+      } else if (key === ' ' || key === 'Space') {
+        mappedKey = ' ';
+        mappedCode = 'Space';
+        e.preventDefault();
+      }
+      
+      if (mappedKey) {
+        var physicalId = key + '_physical';
+        if (physicalKeysActive[physicalId]) {
+          physicalKeysActive[physicalId] = false;
+          var c = getCanvas();
+          if (c) {
+            c.dispatchEvent(new KeyboardEvent('keyup', {
+              key: mappedKey,
+              code: mappedCode,
+              keyCode: codeToKeyCode(mappedCode),
+              which: codeToKeyCode(mappedCode),
+              bubbles: true,
+              cancelable: true
+            }));
+          }
+        }
+        e.preventDefault();
+      }
+    });
+    
+    // Also listen for original arrow keys directly on canvas to allow them to pass through
+    // but we already handle them above to prevent scroll. That's fine.
+    
+    // Ensure canvas receives focus on click
     canvas.addEventListener('click', function() { canvas.focus(); });
+    canvas.addEventListener('keydown', function(e) {
+      // Let canvas handle events, but we've already dispatched mapped ones
+      // This just prevents double handling from our own dispatches
+    });
+    
     // Initial focus
     setTimeout(function() { canvas.focus(); }, 100);
   }
 
   // Also ensure that if user clicks on canvas, it focuses
   document.body.addEventListener('click', function(e) {
-    if (e.target === canvas || canvas.contains(e.target)) {
-      canvas.focus();
+    if (e.target === canvas || (canvas && canvas.contains(e.target))) {
+      if (canvas) canvas.focus();
     }
   });
 
-  // For debugging: log that keyboard is enabled (optional)
-  console.log('Keyboard inputs are fully enabled alongside touch controls');
+  console.log('Keyboard inputs enabled: Arrow keys, A/D for movement, Space for jump');
 })();
 </script>
 
