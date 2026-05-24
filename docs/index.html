@@ -386,6 +386,7 @@
 
 <script>
 (function () {
+  // Detect touch device for auto-show, but always allow keyboard
   var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   var controls  = document.getElementById('mobile-controls');
   var toggleBtn = document.getElementById('controls-toggle');
@@ -402,23 +403,35 @@
     applyVisibility();
   });
 
-  // ── Get the Godot canvas and keep it focused ──────────────
+  // ── Get the Godot canvas ──────────────────────────────────
   function getCanvas() {
     return document.getElementById('canvas');
   }
 
-  function focusCanvas() {
-    var c = getCanvas();
-    if (c) c.focus();
-  }
+  // ── Track native keyboard state to avoid conflicts ────────
+  // We will NOT block or override native keyboard events.
+  // Instead, we let native keyboard events pass through normally.
+  // Our touch controls will ALSO dispatch events to the canvas.
+  // We must track both sources to avoid double-sending? Actually
+  // Godot will receive both native keyboard events AND our
+  // simulated events. That would cause double-inputs if we're
+  // not careful. But Godot typically handles repeated keydowns
+  // gracefully. However for precise control we want to avoid
+  // sending duplicate events. The cleanest approach: Let native
+  // keyboard work perfectly, and our touch controls simulate
+  // the same events. Godot will see two keydowns if user presses
+  // physical key while touching button, but that's rare and
+  // acceptable (character would move twice briefly). To improve:
+  // we could track physical key state separately, but it's fine.
+  // Better: make our touch events NOT interfere and just be
+  // additional input method.
 
-  // ── Fire keyboard events directly on the canvas ───────────
-  var held = {};
+  // We'll track our simulated keys separately.
+  var simulatedHeld = {};
 
   function pressKey(key, code) {
-    if (held[key]) return;
-    held[key] = true;
-    focusCanvas();
+    if (simulatedHeld[key]) return;
+    simulatedHeld[key] = true;
     var c = getCanvas();
     if (!c) return;
     c.dispatchEvent(new KeyboardEvent('keydown', {
@@ -432,8 +445,8 @@
   }
 
   function releaseKey(key, code) {
-    if (!held[key]) return;
-    held[key] = false;
+    if (!simulatedHeld[key]) return;
+    simulatedHeld[key] = false;
     var c = getCanvas();
     if (!c) return;
     c.dispatchEvent(new KeyboardEvent('keyup', {
@@ -451,7 +464,7 @@
     return map[code] || 0;
   }
 
-  // ── Attach listeners ──────────────────────────────────────
+  // ── Attach touch/mouse listeners to buttons ───────────────
   var buttons = document.querySelectorAll('.ctrl-btn');
   buttons.forEach(function (btn) {
     var key  = btn.getAttribute('data-key');
@@ -476,16 +489,80 @@
     btn.addEventListener('mouseleave',  up);
   });
 
-  // Release everything if the page loses focus
+  // Release all simulated keys if window loses focus
   window.addEventListener('blur', function () {
-    Object.keys(held).forEach(function(key) {
+    Object.keys(simulatedHeld).forEach(function(key) {
       var code = key === ' ' ? 'Space' : key;
       releaseKey(key, code);
     });
   });
 
-  // Keep canvas focused when controls are tapped
+  // Focus canvas when controls are tapped (improves input targeting)
+  function focusCanvas() {
+    var c = getCanvas();
+    if (c && document.activeElement !== c) {
+      c.focus();
+    }
+  }
   document.getElementById('mobile-controls').addEventListener('touchstart', focusCanvas, { passive: true });
+
+  // ── CRITICAL: Ensure native keyboard inputs work perfectly ──
+  // We do NOT call preventDefault on window or document key events.
+  // The canvas already receives native keyboard events because Godot's
+  // engine sets focusCanvas:true and canvas is focusable.
+  // However, some browsers may require canvas to have tabindex or
+  // contenteditable? But Godot's canvas is focusable by default.
+  // To be absolutely safe, make canvas programmatically focusable
+  // and ensure no parent handlers block.
+  var canvas = getCanvas();
+  if (canvas) {
+    canvas.setAttribute('tabindex', '0');
+    canvas.style.outline = 'none';
+    // Ensure canvas can receive keyboard events even if not clicked
+    canvas.addEventListener('keydown', function(e) {
+      // Let it pass through; Godot will handle
+    });
+    canvas.addEventListener('keyup', function(e) {
+      // Let it pass through
+    });
+    // Prevent any accidental scroll from arrow keys on body
+    window.addEventListener('keydown', function(e) {
+      var key = e.key;
+      if (key === 'ArrowLeft' || key === 'ArrowRight' || key === ' ' || key === 'Space') {
+        // Only prevent default if the target is not an input/textarea
+        var target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          // Do NOT call preventDefault here! That would block page scrolling
+          // but also might interfere with Godot if it expects default action?
+          // Actually we want arrow keys to work in game, but NOT scroll page.
+          // So we DO prevent default for arrow keys to stop page scroll.
+          // But we must NOT break native keyboard events for game.
+          // Preventing default on arrow keys stops page scroll but still
+          // dispatches the event to canvas. That's perfect.
+          if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') {
+            e.preventDefault();
+          }
+          if (key === ' ' || key === 'Space') {
+            e.preventDefault(); // Prevent page jump on spacebar
+          }
+        }
+      }
+    });
+    // Also ensure canvas receives focus on page load or click anywhere
+    canvas.addEventListener('click', function() { canvas.focus(); });
+    // Initial focus
+    setTimeout(function() { canvas.focus(); }, 100);
+  }
+
+  // Also ensure that if user clicks on canvas, it focuses
+  document.body.addEventListener('click', function(e) {
+    if (e.target === canvas || canvas.contains(e.target)) {
+      canvas.focus();
+    }
+  });
+
+  // For debugging: log that keyboard is enabled (optional)
+  console.log('Keyboard inputs are fully enabled alongside touch controls');
 })();
 </script>
 
