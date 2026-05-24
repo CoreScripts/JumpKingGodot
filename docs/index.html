@@ -243,7 +243,7 @@
         })();
     //]]></script>
 
-<!-- MOBILE CONTROLS — paste just before </body -->
+<!-- MOBILE CONTROLS — paste just before </body> -->
 <style>
   #mobile-controls {
     position: fixed;
@@ -255,7 +255,6 @@
     z-index: 1000;
     user-select: none;
     -webkit-user-select: none;
-    font-family: 'Courier New', monospace;
   }
 
   #mobile-controls.hidden {
@@ -281,7 +280,6 @@
   }
   #controls-toggle:hover { background: rgba(0,0,0,0.8); }
 
-  /* three-line hamburger / X drawn in CSS */
   #controls-toggle .bar {
     position: absolute;
     width: 16px;
@@ -292,14 +290,9 @@
   }
   #controls-toggle .bar:nth-child(1) { transform: translateY(-5px); }
   #controls-toggle .bar:nth-child(3) { transform: translateY(5px); }
-
-  #controls-toggle.active .bar:nth-child(1) {
-    transform: translateY(0) rotate(45deg);
-  }
+  #controls-toggle.active .bar:nth-child(1) { transform: translateY(0) rotate(45deg); }
   #controls-toggle.active .bar:nth-child(2) { opacity: 0; }
-  #controls-toggle.active .bar:nth-child(3) {
-    transform: translateY(0) rotate(-45deg);
-  }
+  #controls-toggle.active .bar:nth-child(3) { transform: translateY(0) rotate(-45deg); }
 
   /* ── D-pad left cluster ──────────────────────── */
   #dpad {
@@ -335,14 +328,12 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .ctrl-btn:active,
   .ctrl-btn.pressed {
     background: rgba(255, 255, 255, 0.22);
     border-color: rgba(255, 255, 255, 0.7);
     transform: scale(0.93);
   }
 
-  /* Arrow shapes drawn in pure CSS — no emoji */
   .arrow {
     width: 0;
     height: 0;
@@ -364,7 +355,6 @@
     border-bottom: 18px solid rgba(255,255,255,0.85);
   }
 
-  /* make jump button slightly larger */
   #btn-jump {
     width: 72px;
     height: 72px;
@@ -372,28 +362,23 @@
   }
 </style>
 
-<!-- Toggle button -->
 <button id="controls-toggle" title="Toggle mobile controls" aria-label="Toggle mobile controls">
   <span class="bar"></span>
   <span class="bar"></span>
   <span class="bar"></span>
 </button>
 
-<!-- Controls overlay -->
 <div id="mobile-controls">
-  <!-- Left: D-pad -->
   <div id="dpad">
-    <div class="ctrl-btn" id="btn-left"  data-key="ArrowLeft">
+    <div class="ctrl-btn" id="btn-left"  data-key="ArrowLeft"  data-code="ArrowLeft">
       <span class="arrow arrow-left"></span>
     </div>
-    <div class="ctrl-btn" id="btn-right" data-key="ArrowRight">
+    <div class="ctrl-btn" id="btn-right" data-key="ArrowRight" data-code="ArrowRight">
       <span class="arrow arrow-right"></span>
     </div>
   </div>
-
-  <!-- Right: Jump -->
   <div id="btn-jump-wrap">
-    <div class="ctrl-btn" id="btn-jump" data-key=" ">
+    <div class="ctrl-btn" id="btn-jump" data-key=" " data-code="Space">
       <span class="arrow arrow-up"></span>
     </div>
   </div>
@@ -402,9 +387,9 @@
 <script>
 (function () {
   var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-  var controls   = document.getElementById('mobile-controls');
-  var toggleBtn  = document.getElementById('controls-toggle');
-  var visible    = isTouchDevice; // auto-show on touch
+  var controls  = document.getElementById('mobile-controls');
+  var toggleBtn = document.getElementById('controls-toggle');
+  var visible   = isTouchDevice;
 
   function applyVisibility() {
     controls.classList.toggle('hidden', !visible);
@@ -417,55 +402,90 @@
     applyVisibility();
   });
 
-  // ── Key simulation ──────────────────────────────
+  // ── Get the Godot canvas and keep it focused ──────────────
+  function getCanvas() {
+    return document.getElementById('canvas');
+  }
+
+  function focusCanvas() {
+    var c = getCanvas();
+    if (c) c.focus();
+  }
+
+  // ── Fire keyboard events directly on the canvas ───────────
   var held = {};
 
-  function pressKey(key) {
+  function pressKey(key, code) {
     if (held[key]) return;
     held[key] = true;
-    window.dispatchEvent(new KeyboardEvent('keydown', {
-      key: key, code: key === ' ' ? 'Space' : 'Arrow' + key.replace('Arrow',''),
-      bubbles: true, cancelable: true
+    focusCanvas();
+    var c = getCanvas();
+    if (!c) return;
+    c.dispatchEvent(new KeyboardEvent('keydown', {
+      key: key,
+      code: code,
+      keyCode: codeToKeyCode(code),
+      which: codeToKeyCode(code),
+      bubbles: true,
+      cancelable: true
     }));
   }
 
-  function releaseKey(key) {
+  function releaseKey(key, code) {
     if (!held[key]) return;
     held[key] = false;
-    window.dispatchEvent(new KeyboardEvent('keyup', {
-      key: key, code: key === ' ' ? 'Space' : 'Arrow' + key.replace('Arrow',''),
-      bubbles: true, cancelable: true
+    var c = getCanvas();
+    if (!c) return;
+    c.dispatchEvent(new KeyboardEvent('keyup', {
+      key: key,
+      code: code,
+      keyCode: codeToKeyCode(code),
+      which: codeToKeyCode(code),
+      bubbles: true,
+      cancelable: true
     }));
   }
 
-  // ── Attach touch + mouse to every button ────────
+  function codeToKeyCode(code) {
+    var map = { ArrowLeft: 37, ArrowRight: 39, Space: 32 };
+    return map[code] || 0;
+  }
+
+  // ── Attach listeners ──────────────────────────────────────
   var buttons = document.querySelectorAll('.ctrl-btn');
   buttons.forEach(function (btn) {
-    var key = btn.getAttribute('data-key');
+    var key  = btn.getAttribute('data-key');
+    var code = btn.getAttribute('data-code');
 
     function down(e) {
       e.preventDefault();
       btn.classList.add('pressed');
-      pressKey(key);
+      pressKey(key, code);
     }
     function up(e) {
       e.preventDefault();
       btn.classList.remove('pressed');
-      releaseKey(key);
+      releaseKey(key, code);
     }
 
-    btn.addEventListener('touchstart', down, { passive: false });
-    btn.addEventListener('touchend',   up,   { passive: false });
-    btn.addEventListener('touchcancel',up,   { passive: false });
-    btn.addEventListener('mousedown',  down);
-    btn.addEventListener('mouseup',    up);
-    btn.addEventListener('mouseleave', up);
+    btn.addEventListener('touchstart',  down, { passive: false });
+    btn.addEventListener('touchend',    up,   { passive: false });
+    btn.addEventListener('touchcancel', up,   { passive: false });
+    btn.addEventListener('mousedown',   down);
+    btn.addEventListener('mouseup',     up);
+    btn.addEventListener('mouseleave',  up);
   });
 
-  // Release all keys if focus leaves window
+  // Release everything if the page loses focus
   window.addEventListener('blur', function () {
-    Object.keys(held).forEach(releaseKey);
+    Object.keys(held).forEach(function(key) {
+      var code = key === ' ' ? 'Space' : key;
+      releaseKey(key, code);
+    });
   });
+
+  // Keep canvas focused when controls are tapped
+  document.getElementById('mobile-controls').addEventListener('touchstart', focusCanvas, { passive: true });
 })();
 </script>
 
