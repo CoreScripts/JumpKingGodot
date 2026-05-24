@@ -411,56 +411,59 @@
   // ── Track simulated keys from touch controls ──────────────
   var simulatedHeld = {};
 
-  // Map A/D to left/right keyCodes for proper simulation
-  function getKeyInfoFromKey(key) {
-    // Handle A/D as aliases for left/right movement
-    if (key === 'a' || key === 'A') {
-      return { key: 'ArrowLeft', code: 'ArrowLeft', mappedKey: 'ArrowLeft' };
-    }
-    if (key === 'd' || key === 'D') {
-      return { key: 'ArrowRight', code: 'ArrowRight', mappedKey: 'ArrowRight' };
-    }
-    // Space/jump
-    if (key === ' ') {
-      return { key: ' ', code: 'Space', mappedKey: ' ' };
-    }
-    // Arrow keys pass through
-    return { key: key, code: key, mappedKey: key };
-  }
-
   function pressKey(key, code) {
-    if (simulatedHeld[key]) return;
-    simulatedHeld[key] = true;
+    var lookupKey = key === ' ' ? 'Space' : key;
+    if (simulatedHeld[lookupKey]) return;
+    simulatedHeld[lookupKey] = true;
+    
+    // Dispatch to both canvas and window for better compatibility
     var c = getCanvas();
-    if (!c) return;
-    c.dispatchEvent(new KeyboardEvent('keydown', {
+    var keyCode = code === 'ArrowLeft' ? 37 : (code === 'ArrowRight' ? 39 : 32);
+    
+    var eventProps = {
       key: key,
       code: code,
-      keyCode: codeToKeyCode(code),
-      which: codeToKeyCode(code),
+      keyCode: keyCode,
+      which: keyCode,
       bubbles: true,
-      cancelable: true
-    }));
+      cancelable: true,
+      composed: true
+    };
+    
+    var event = new KeyboardEvent('keydown', eventProps);
+    
+    // Dispatch to window (Godot often listens here)
+    window.dispatchEvent(event);
+    
+    // Also dispatch to canvas
+    if (c) {
+      c.dispatchEvent(event);
+    }
   }
 
   function releaseKey(key, code) {
-    if (!simulatedHeld[key]) return;
-    simulatedHeld[key] = false;
+    var lookupKey = key === ' ' ? 'Space' : key;
+    if (!simulatedHeld[lookupKey]) return;
+    simulatedHeld[lookupKey] = false;
+    
     var c = getCanvas();
-    if (!c) return;
-    c.dispatchEvent(new KeyboardEvent('keyup', {
+    var keyCode = code === 'ArrowLeft' ? 37 : (code === 'ArrowRight' ? 39 : 32);
+    
+    var eventProps = {
       key: key,
       code: code,
-      keyCode: codeToKeyCode(code),
-      which: codeToKeyCode(code),
+      keyCode: keyCode,
+      which: keyCode,
       bubbles: true,
-      cancelable: true
-    }));
-  }
-
-  function codeToKeyCode(code) {
-    var map = { ArrowLeft: 37, ArrowRight: 39, Space: 32 };
-    return map[code] || 0;
+      cancelable: true,
+      composed: true
+    };
+    
+    var event = new KeyboardEvent('keyup', eventProps);
+    window.dispatchEvent(event);
+    if (c) {
+      c.dispatchEvent(event);
+    }
   }
 
   // ── Attach touch/mouse listeners to buttons ───────────────
@@ -491,168 +494,183 @@
   // Release all simulated keys if window loses focus
   window.addEventListener('blur', function () {
     Object.keys(simulatedHeld).forEach(function(key) {
-      var code = key === ' ' ? 'Space' : key;
-      releaseKey(key, code);
+      var code = key === 'Space' ? 'Space' : (key === 'ArrowLeft' ? 'ArrowLeft' : 'ArrowRight');
+      var displayKey = code === 'Space' ? ' ' : code;
+      releaseKey(displayKey, code);
     });
   });
 
-  // Focus canvas when controls are tapped (improves input targeting)
+  // Focus canvas when controls are tapped
   function focusCanvas() {
     var c = getCanvas();
     if (c && document.activeElement !== c) {
       c.focus();
     }
   }
-  document.getElementById('mobile-controls').addEventListener('touchstart', focusCanvas, { passive: true });
+  if (document.getElementById('mobile-controls')) {
+    document.getElementById('mobile-controls').addEventListener('touchstart', focusCanvas, { passive: true });
+  }
 
-  // ── CRITICAL: Ensure native keyboard inputs work perfectly ──
-  // AND add support for A/D keys alongside arrows
+  // ── KEYBOARD SUPPORT with A/D mapping ─────────────────────
   var canvas = getCanvas();
   if (canvas) {
     canvas.setAttribute('tabindex', '0');
     canvas.style.outline = 'none';
+  }
+  
+  // Track physical key state to avoid double events
+  var physicalActive = {};
+  
+  // Helper to send key event to Godot
+  function sendKeyEvent(type, originalKey, mappedKey, mappedCode) {
+    var target = getCanvas();
+    if (!target) target = window;
     
-    // We'll let the canvas handle events normally, but we also need to
-    // ensure A/D keys are sent to Godot. Since Godot may only listen for
-    // arrow keys, we need to translate A/D into arrow keys at the canvas level.
-    // However, Godot's input map might already have A/D bound. To be safe,
-    // we'll capture A/D on window and dispatch arrow events to canvas.
-    // This way physical A/D keys will act exactly like arrow keys.
+    var keyCode = mappedCode === 'ArrowLeft' ? 37 : (mappedCode === 'ArrowRight' ? 39 : 32);
     
-    // Keep track of original physical key state to avoid double events
-    var physicalKeysActive = {};
-    
-    window.addEventListener('keydown', function(e) {
-      var key = e.key;
-      var target = e.target;
-      // Don't interfere with input fields
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        return;
-      }
-      
-      var mappedKey = null;
-      var mappedCode = null;
-      
-      // Map A and D to left/right arrows
-      if (key === 'a' || key === 'A') {
-        mappedKey = 'ArrowLeft';
-        mappedCode = 'ArrowLeft';
-        e.preventDefault(); // Prevent any default action
-      } else if (key === 'd' || key === 'D') {
-        mappedKey = 'ArrowRight';
-        mappedCode = 'ArrowRight';
-        e.preventDefault();
-      } else if (key === 'ArrowLeft') {
-        mappedKey = 'ArrowLeft';
-        mappedCode = 'ArrowLeft';
-        e.preventDefault(); // Prevent page scroll
-      } else if (key === 'ArrowRight') {
-        mappedKey = 'ArrowRight';
-        mappedCode = 'ArrowRight';
-        e.preventDefault();
-      } else if (key === ' ' || key === 'Space') {
-        mappedKey = ' ';
-        mappedCode = 'Space';
-        e.preventDefault(); // Prevent page jump
-      }
-      
-      if (mappedKey) {
-        // Prevent duplicate events if the same physical key is held
-        var physicalId = key + '_physical';
-        if (!physicalKeysActive[physicalId]) {
-          physicalKeysActive[physicalId] = true;
-          var c = getCanvas();
-          if (c) {
-            // Dispatch the mapped event to canvas
-            c.dispatchEvent(new KeyboardEvent('keydown', {
-              key: mappedKey,
-              code: mappedCode,
-              keyCode: codeToKeyCode(mappedCode),
-              which: codeToKeyCode(mappedCode),
-              bubbles: true,
-              cancelable: true
-            }));
-          }
-        }
-        // Also prevent default on window to avoid any browser shortcuts
-        e.preventDefault();
-      }
+    var event = new KeyboardEvent(type, {
+      key: mappedKey,
+      code: mappedCode,
+      keyCode: keyCode,
+      which: keyCode,
+      bubbles: true,
+      cancelable: true,
+      composed: true
     });
     
-    window.addEventListener('keyup', function(e) {
-      var key = e.key;
-      var target = e.target;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        return;
-      }
-      
-      var mappedKey = null;
-      var mappedCode = null;
-      
-      if (key === 'a' || key === 'A') {
-        mappedKey = 'ArrowLeft';
-        mappedCode = 'ArrowLeft';
-        e.preventDefault();
-      } else if (key === 'd' || key === 'D') {
-        mappedKey = 'ArrowRight';
-        mappedCode = 'ArrowRight';
-        e.preventDefault();
-      } else if (key === 'ArrowLeft') {
-        mappedKey = 'ArrowLeft';
-        mappedCode = 'ArrowLeft';
-        e.preventDefault();
-      } else if (key === 'ArrowRight') {
-        mappedKey = 'ArrowRight';
-        mappedCode = 'ArrowRight';
-        e.preventDefault();
-      } else if (key === ' ' || key === 'Space') {
-        mappedKey = ' ';
-        mappedCode = 'Space';
-        e.preventDefault();
-      }
-      
-      if (mappedKey) {
-        var physicalId = key + '_physical';
-        if (physicalKeysActive[physicalId]) {
-          physicalKeysActive[physicalId] = false;
-          var c = getCanvas();
-          if (c) {
-            c.dispatchEvent(new KeyboardEvent('keyup', {
-              key: mappedKey,
-              code: mappedCode,
-              keyCode: codeToKeyCode(mappedCode),
-              which: codeToKeyCode(mappedCode),
-              bubbles: true,
-              cancelable: true
-            }));
-          }
-        }
-        e.preventDefault();
-      }
-    });
+    target.dispatchEvent(event);
+    window.dispatchEvent(event); // Also dispatch to window to be safe
+  }
+  
+  // Listen for keydown on window
+  window.addEventListener('keydown', function(e) {
+    var key = e.key;
+    var target = e.target;
     
-    // Also listen for original arrow keys directly on canvas to allow them to pass through
-    // but we already handle them above to prevent scroll. That's fine.
+    // Don't interfere with input fields
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
     
-    // Ensure canvas receives focus on click
-    canvas.addEventListener('click', function() { canvas.focus(); });
+    var mappedKey = null;
+    var mappedCode = null;
+    var shouldPrevent = false;
+    
+    // Map A and D to arrow keys
+    if (key === 'a' || key === 'A') {
+      mappedKey = 'ArrowLeft';
+      mappedCode = 'ArrowLeft';
+      shouldPrevent = true;
+    } else if (key === 'd' || key === 'D') {
+      mappedKey = 'ArrowRight';
+      mappedCode = 'ArrowRight';
+      shouldPrevent = true;
+    } else if (key === 'ArrowLeft') {
+      mappedKey = 'ArrowLeft';
+      mappedCode = 'ArrowLeft';
+      shouldPrevent = true;
+    } else if (key === 'ArrowRight') {
+      mappedKey = 'ArrowRight';
+      mappedCode = 'ArrowRight';
+      shouldPrevent = true;
+    } else if (key === ' ' || key === 'Space' || key === 'Spacebar') {
+      mappedKey = ' ';
+      mappedCode = 'Space';
+      shouldPrevent = true;
+    }
+    
+    if (mappedKey) {
+      // Prevent duplicate events
+      var id = mappedCode;
+      if (!physicalActive[id]) {
+        physicalActive[id] = true;
+        sendKeyEvent('keydown', key, mappedKey, mappedCode);
+      }
+      
+      if (shouldPrevent) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+  });
+  
+  window.addEventListener('keyup', function(e) {
+    var key = e.key;
+    var target = e.target;
+    
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    var mappedKey = null;
+    var mappedCode = null;
+    var shouldPrevent = false;
+    
+    if (key === 'a' || key === 'A') {
+      mappedKey = 'ArrowLeft';
+      mappedCode = 'ArrowLeft';
+      shouldPrevent = true;
+    } else if (key === 'd' || key === 'D') {
+      mappedKey = 'ArrowRight';
+      mappedCode = 'ArrowRight';
+      shouldPrevent = true;
+    } else if (key === 'ArrowLeft') {
+      mappedKey = 'ArrowLeft';
+      mappedCode = 'ArrowLeft';
+      shouldPrevent = true;
+    } else if (key === 'ArrowRight') {
+      mappedKey = 'ArrowRight';
+      mappedCode = 'ArrowRight';
+      shouldPrevent = true;
+    } else if (key === ' ' || key === 'Space' || key === 'Spacebar') {
+      mappedKey = ' ';
+      mappedCode = 'Space';
+      shouldPrevent = true;
+    }
+    
+    if (mappedKey) {
+      var id = mappedCode;
+      if (physicalActive[id]) {
+        physicalActive[id] = false;
+        sendKeyEvent('keyup', key, mappedKey, mappedCode);
+      }
+      
+      if (shouldPrevent) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+  });
+  
+  // Also listen for original key events on canvas directly
+  if (canvas) {
     canvas.addEventListener('keydown', function(e) {
-      // Let canvas handle events, but we've already dispatched mapped ones
-      // This just prevents double handling from our own dispatches
+      // Let our window handler manage it, but ensure no double handling
+      if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D' ||
+          e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Space') {
+        e.preventDefault();
+      }
     });
+    
+    canvas.addEventListener('click', function() { canvas.focus(); });
     
     // Initial focus
     setTimeout(function() { canvas.focus(); }, 100);
   }
-
-  // Also ensure that if user clicks on canvas, it focuses
+  
+  // Click anywhere on body to focus canvas (for keyboard to work)
   document.body.addEventListener('click', function(e) {
-    if (e.target === canvas || (canvas && canvas.contains(e.target))) {
-      if (canvas) canvas.focus();
+    if (canvas && e.target !== canvas && !canvas.contains(e.target)) {
+      // Don't steal focus if clicking on controls button
+      if (e.target.id !== 'controls-toggle' && !e.target.closest('.ctrl-btn')) {
+        canvas.focus();
+      }
+    } else if (canvas && (e.target === canvas || canvas.contains(e.target))) {
+      canvas.focus();
     }
   });
-
-  console.log('Keyboard inputs enabled: Arrow keys, A/D for movement, Space for jump');
+  
+  console.log('Keyboard enabled: Arrow keys, A/D for movement, Space for jump');
 })();
 </script>
 
